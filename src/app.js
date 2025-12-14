@@ -3,7 +3,7 @@ import cors from "cors";
 import cookieParser from "cookie-parser";
 import userRoutes from "./routes/user.routes.js";
 import resumeRoutes from "./routes/resume.routes.js";
-import interviewRoutes from "./routes/interview.routes.js"; // import interview routes
+import interviewRoutes from "./routes/interview.routes.js";
 
 const app = express();
 
@@ -19,7 +19,7 @@ app.use(cookieParser());
 // Mount routes
 app.use("/api/users", userRoutes);
 app.use("/api/resume", resumeRoutes);
-app.use("/api/interview", interviewRoutes); // mount interview routes
+app.use("/api/interview", interviewRoutes);
 
 // Health check
 app.get("/", (req, res) => {
@@ -30,7 +30,7 @@ app.get("/", (req, res) => {
 app.use((req, res) => res.status(404).json({ success: false, message: `Route not found: ${req.originalUrl}` }));
 
 // Global error handler
-app.use((err, req, res, next) => 
+app.use((err, req, res, next) =>
   res.status(err.status || 500).json({ success: false, message: err.message || "Internal Server Error" })
 );
 

@@ -4,7 +4,7 @@ import fs from "fs";
 
 const uploadDir = "uploads/resumes";
 
-// ensure directory exists
+// Ensure upload directory exists
 if (!fs.existsSync(uploadDir)) {
   fs.mkdirSync(uploadDir, { recursive: true });
 }

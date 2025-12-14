@@ -4,7 +4,10 @@ import { uploadResume, processResume } from "../controllers/resume.controller.js
 
 const router = express.Router();
 
-router.post("/upload", upload.single("resume"), uploadResume); // NEW
+// Upload resume
+router.post("/upload", upload.single("resume"), uploadResume);
+
+// Analyze resume (ATS + AI questions)
 router.post("/analyze", upload.single("resume"), processResume);
 
 export default router;
