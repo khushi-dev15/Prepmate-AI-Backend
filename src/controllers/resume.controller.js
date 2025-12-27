@@ -3,7 +3,9 @@ import fs from "fs";
 import path from "path";
 import { createRequire } from "module";
 const require = createRequire(import.meta.url);
-const pdfParse = require("pdf-parse");
+const pdfParseModule = require("pdf-parse");
+// Handle both default export and direct export
+const pdfParse = pdfParseModule.default || pdfParseModule;
 import * as mammoth from "mammoth"; // DOCX parsing
 import { promisify } from "util";
 import { Resume } from "../models/resume.model.js";
@@ -67,21 +69,38 @@ export const processResume = async (req, res) => {
     const file = req.file;
     const userId = req.user?._id;
 
-    if (!jobTitle || !file) {
-      console.warn("❌ Missing jobTitle or file:", { jobTitle: !!jobTitle, file: !!file });
-      return res.status(400).json({ message: "Missing jobTitle or file" });
+    // allow processing when either a file is uploaded or a stored resumeId is provided
+    if (!jobTitle || (!file && !resumeId)) {
+      console.warn("❌ Missing jobTitle or file/resumeId:", { jobTitle: !!jobTitle, file: !!file, resumeId: !!resumeId });
+      return res.status(400).json({ message: "Missing jobTitle or file/resumeId" });
+    }
+
+    // Determine file path and original name either from uploaded file or stored resume record
+    let filePathToRead;
+    let originalNameToUse;
+    if (file) {
+      filePathToRead = file.path;
+      originalNameToUse = file.originalname;
+    } else {
+      const storedResume = await Resume.findById(resumeId);
+      if (!storedResume) {
+        console.warn("❌ Resume id provided but not found:", resumeId);
+        return res.status(404).json({ message: "Stored resume not found" });
+      }
+      filePathToRead = storedResume.path;
+      originalNameToUse = storedResume.originalName;
     }
 
     console.log("✅ Starting resume processing for job:", jobTitle);
 
     let extractedText = "";
-    const ext = path.extname(file.originalname).toLowerCase();
+    const ext = path.extname(originalNameToUse).toLowerCase();
 
     // Read file with timeout to prevent hanging
     let buffer;
     try {
       buffer = await Promise.race([
-        readFileAsync(file.path),
+        readFileAsync(filePathToRead),
         new Promise((_, reject) => 
           setTimeout(() => reject(new Error("File read timeout")), 30000)
         )
@@ -96,8 +115,8 @@ export const processResume = async (req, res) => {
         const pdfData = await pdfParse(buffer);
         extractedText = pdfData.text || "";
       } catch (pdfErr) {
-        console.error("❌ PDF parse error:", pdfErr.message);
-        return res.status(500).json({ message: `Error parsing PDF: ${pdfErr.message}` });
+        console.error("❌ PDF parse error:", pdfErr?.message || pdfErr);
+        return res.status(500).json({ message: `Error parsing PDF: ${pdfErr?.message || String(pdfErr)}` });
       }
     } else if (ext === ".docx") {
       try {
@@ -173,10 +192,10 @@ export const processResume = async (req, res) => {
     }
 
     return res.status(200).json({
-      success: true,
-      jobTitle,
-      category,
-      file: file.originalname,
+    success: true,
+    jobTitle,
+    category,
+    file: originalNameToUse,
       atsScore: ats.score,
       atsScoreNormalized: normalizedScore,
       matchPercent: ats.matchPercent,
