@@ -3,9 +3,21 @@ import fs from "fs";
 import path from "path";
 import { createRequire } from "module";
 const require = createRequire(import.meta.url);
-const pdfParseModule = require("pdf-parse");
-// Handle both default export and direct export
-const pdfParse = pdfParseModule.default || pdfParseModule;
+
+// Safely load pdf-parse with better error handling
+let pdfParse;
+try {
+  const pdfParseModule = require("pdf-parse");
+  pdfParse = pdfParseModule?.default || pdfParseModule;
+  if (typeof pdfParse !== 'function') {
+    pdfParse = null;
+    console.warn('⚠️ pdf-parse loaded but not a function, fallback mode enabled');
+  }
+} catch (err) {
+  console.error('⚠️ Failed to load pdf-parse:', err?.message);
+  pdfParse = null;
+}
+
 import * as mammoth from "mammoth"; // DOCX parsing
 import { promisify } from "util";
 import { Resume } from "../models/resume.model.js";
@@ -112,11 +124,18 @@ export const processResume = async (req, res) => {
 
     if (ext === ".pdf") {
       try {
-        const pdfData = await pdfParse(buffer);
-        extractedText = pdfData.text || "";
+        if (!pdfParse) {
+          console.warn("⚠️ pdf-parse not available, skipping PDF text extraction");
+          extractedText = "[PDF uploaded - text extraction not available]";
+        } else {
+          const pdfData = await pdfParse(buffer);
+          extractedText = pdfData.text || "[PDF uploaded - no text extracted]";
+        }
       } catch (pdfErr) {
         console.error("❌ PDF parse error:", pdfErr?.message || pdfErr);
-        return res.status(500).json({ message: `Error parsing PDF: ${pdfErr?.message || String(pdfErr)}` });
+        // Fallback: continue with empty text instead of failing completely
+        console.warn("⚠️ Using fallback for PDF - will process with minimal text");
+        extractedText = "[PDF uploaded - parsing failed, using fallback]";
       }
     } else if (ext === ".docx") {
       try {
