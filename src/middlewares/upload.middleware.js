@@ -14,11 +14,48 @@ const storage = multer.diskStorage({
     cb(null, uploadDir);
   },
   filename: (req, file, cb) => {
-    const ext = path.extname(file.originalname);
-    cb(null, `${Date.now()}-${file.originalname.replace(/\s+/g, "_")}${ext}`);
+    try {
+      const ext = path.extname(file.originalname);
+      const name = path.basename(file.originalname, ext);
+      const uniqueName = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}-${name.replace(/[^a-z0-9]/gi, '_').toLowerCase()}${ext}`;
+      console.log("✅ File storage:", uniqueName);
+      cb(null, uniqueName);
+    } catch (err) {
+      console.error("❌ Storage error:", err);
+      cb(err);
+    }
   },
 });
 
-const uploadMiddleware = multer({ storage });
+// Filter for allowed file types
+const fileFilter = (req, file, cb) => {
+  const allowedMimes = [
+    'application/pdf', 
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    'application/msword'
+  ];
+  const allowedExt = ['.pdf', '.docx', '.doc'];
+  
+  const ext = path.extname(file.originalname).toLowerCase();
+  
+  console.log("🔍 File check - Name:", file.originalname, "Ext:", ext, "Mime:", file.mimetype);
+  
+  if (allowedExt.includes(ext) || allowedMimes.includes(file.mimetype)) {
+    console.log("✅ File accepted");
+    cb(null, true);
+  } else {
+    console.error("❌ File rejected - Format not allowed");
+    cb(new Error('केवल PDF और DOCX फाइलें allowed हैं (Only PDF and DOCX files allowed)'), false);
+  }
+};
 
+const uploadMiddleware = multer({ 
+  storage,
+  fileFilter,
+  limits: {
+    fileSize: 10 * 1024 * 1024 // 10MB limit
+  }
+});
+
+console.log("✅ Upload middleware initialized");
 export default uploadMiddleware;

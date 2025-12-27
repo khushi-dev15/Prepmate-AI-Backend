@@ -41,3 +41,23 @@ export const loginController = async (req, res) => {
     res.status(500).json({ success: false, message: err.message });
   }
 };
+
+export const getProfileController = async (req, res) => {
+  try {
+    const userId = req.user?._id;
+    if (!userId) return res.status(401).json({ success: false, message: "Unauthorized" });
+    // lazy-load here to avoid circular imports at top-level
+    const User = (await import('../models/user.model.js')).default;
+    const Result = (await import('../models/result.model.js')).default;
+    const Resume = (await import('../models/resume.model.js')).Resume || (await import('../models/resume.model.js')).default;
+
+    const user = await User.findById(userId).select('username email createdAt latestResumeId latestJobTitle').lean();
+    const results = await Result.find({ user: userId }).sort({ createdAt: -1 }).lean();
+    const resumes = await Resume.find({ user: userId }).select('originalName jobTitleRequested analysis createdAt').sort({ createdAt: -1 }).lean();
+
+    return res.status(200).json({ success: true, user, results, resumes });
+  } catch (err) {
+    console.error('getProfileController error:', err && err.message);
+    return res.status(500).json({ success: false, message: err.message });
+  }
+};

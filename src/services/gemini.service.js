@@ -5,11 +5,14 @@ const OPENAI_URL = "https://api.openai.com/v1/chat/completions"; // replace if y
 const API_KEY = process.env.GEMINI_API_KEY;
 
 // Generate 5 unique questions for given round
-export async function generateInterviewQuestions(jobTitle, round) {
+export async function generateInterviewQuestions(jobTitle, round, jobDescription = "") {
   const interviewType = (round && round.toUpperCase() === "TR") ? "technical" : "hr";
+  // Include jobDescription if available to make questions tightly aligned to the job post
+  const jobContext = jobDescription ? `Job description / context: ${jobDescription}\n` : "";
+  // Strong, deterministic prompt so model generates questions tailored to the job title and description
   const prompt = interviewType === "technical"
-    ? `Generate 5 unique, practical technical interview questions for the role: "${jobTitle}". Return questions each on a new line, no numbering, no extra text.`
-    : `Generate 5 unique HR interview questions for the role: "${jobTitle}". Return questions each on a new line, no numbering, no extra text.`;
+    ? `${jobContext}You are an expert technical interviewer. Using the role title: "${jobTitle}", and the job context above when present, assume typical responsibilities and required technical skills for that role. Generate exactly 5 focused, practical technical interview questions that directly target skills, tools, algorithms, architecture, or problem-solving scenarios relevant to this role. Each question should be concise (one sentence) and reference the likely skill or concept being tested (e.g., "Concurrency in Node.js", "Database schema design", "Big-O complexity"). Return the questions as plain text, one question per line, with no numbering, no explanation, and no extra commentary.`
+    : `${jobContext}You are an expert HR interviewer. Using the role title: "${jobTitle}", and the job context above when present, assume typical responsibilities and soft skills for that role. Generate exactly 5 HR interview questions that probe behavioral fit, communication, teamwork, leadership and culture-fit relevant to this role. Return the questions as plain text, one question per line, with no numbering, no explanation, and no extra commentary.`;
   // If no API key provided, return local fallback questions
   if (!API_KEY) {
     return localGenerateQuestions(jobTitle, interviewType);
@@ -20,11 +23,13 @@ export async function generateInterviewQuestions(jobTitle, round) {
       model: "gpt-4",
       messages: [{ role: "user", content: prompt }],
       max_tokens: 500,
+      temperature: 0.2
     }, {
       headers: {
         Authorization: `Bearer ${API_KEY}`,
         "Content-Type": "application/json",
       },
+      timeout: 20000
     });
 
     const text = res.data.choices?.[0]?.message?.content || "";
@@ -46,36 +51,36 @@ export async function generateInterviewQuestions(jobTitle, round) {
 export async function evaluateAnswersWithAI(answers, jobTitle, round) {
   // We ask model to return strict JSON array of objects
   const roundLabel = round === "TR" ? "Technical" : "HR";
-  const prompt = `
-You are an expert interviewer. Evaluate the following ${roundLabel} round answers for the role "${jobTitle}".
-Return a JSON array of objects corresponding to each answer in the same order.
-Each object must have:
-- score (integer 0-10)
-- feedback (short string)
+  const prompt = `You are an expert interviewer. Evaluate the following ${roundLabel} round answers for the role "${jobTitle}".
+Return ONLY a JSON array (no leading/trailing text) of objects in the same order as the answers.
+Each object must contain exactly two fields:
+- "score": integer between 0 and 10 (10 = excellent, 0 = poor).
+- "feedback": concise (20-120 chars) actionable feedback sentence.
+
+Scoring guidance: consider correctness, depth, relevance to the role, clarity, and use of role-relevant keywords. Be conservative and consistent.
 
 Answers:
 ${answers.map((a, i) => `${i + 1}. ${a || ""}`).join("\n")}
-
-Strictly return only the JSON array.
 `;
 
   try {
     const res = await axios.post(OPENAI_URL, {
       model: "gpt-4",
       messages: [{ role: "user", content: prompt }],
-      max_tokens: 700
+      max_tokens: 700,
+      temperature: 0.2
     }, {
       headers: {
         Authorization: `Bearer ${API_KEY}`,
         "Content-Type": "application/json",
       },
+      timeout: 20000
     });
 
     const text = res.data.choices?.[0]?.message?.content || "";
-    // Extract JSON array from response
-    const jsonMatch = text.match(/\[.*\]/s);
+    // Extract JSON-looking content robustly
+    const jsonMatch = text.match(/\[\s*\{[\s\S]*\}\s*\]/m);
     if (!jsonMatch) {
-      // attempt a looser parse
       throw new Error("AI response not in expected JSON format: " + text.slice(0, 300));
     }
     const parsed = JSON.parse(jsonMatch[0]);
