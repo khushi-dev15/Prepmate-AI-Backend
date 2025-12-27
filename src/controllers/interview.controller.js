@@ -5,9 +5,10 @@ import { Resume } from "../models/resume.model.js";
 
 export async function getInterviewQuestions(req, res) {
   const jobTitle = req.body.jobTitle || req.query.jobTitle || "";
+  const jobDescription = req.body.jobDescription || req.query.jobDescription || "";
   const round = req.body.round || req.query.round || "TR"; // TR or HR
   try {
-    const questions = await generateInterviewQuestions(jobTitle, round);
+    const questions = await generateInterviewQuestions(jobTitle, round, jobDescription);
     res.status(200).json({
       success: true,
       jobTitle,
