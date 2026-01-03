@@ -1,9 +1,12 @@
 import express from "express";
 import cors from "cors";
 import cookieParser from "cookie-parser";
+import passport from "passport";
 import userRoutes from "./routes/user.routes.js";
 import resumeRoutes from "./routes/resume.routes.js";
 import interviewRoutes from "./routes/interview.routes.js";
+import authRoutes from "./routes/auth.routes.js";
+import "./config/passport.js";
 
 const app = express();
 
@@ -55,9 +58,13 @@ app.use(express.json({ limit: "50mb" }));
 app.use(express.urlencoded({ extended: true, limit: "50mb" }));
 app.use(cookieParser());
 
+// Passport middleware
+app.use(passport.initialize());
+
 console.log("✅ Middleware configured");
 
 // Mount routes
+app.use("/api/auth", authRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/resume", resumeRoutes);
 app.use("/api/interview", interviewRoutes);
