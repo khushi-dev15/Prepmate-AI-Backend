@@ -1,18 +1,18 @@
 import passport from "passport";
-import GoogleStrategy from "passport-google-oauth20";
+import { Strategy as GoogleStrategy } from "passport-google-oauth20";
 import User from "../models/user.model.js";
 
 passport.use(
-  new GoogleStrategy.Strategy(
+  new GoogleStrategy(
     {
       clientID: process.env.GOOGLE_CLIENT_ID,
       clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-      callbackURL: process.env.GOOGLE_CALLBACK_URL || "http://localhost:5000/api/auth/google/callback"
+      callbackURL: process.env.GOOGLE_CALLBACK_URL,
     },
     async (accessToken, refreshToken, profile, done) => {
       try {
         const email = profile.emails?.[0]?.value;
-        
+
         if (!email) {
           return done(new Error("Email not provided by Google"), null);
         }
@@ -22,9 +22,7 @@ passport.use(
         if (user) {
           if (!user.googleId) {
             user.googleId = profile.id;
-            if (profile.photos?.[0]?.value) {
-              user.profilePicture = profile.photos[0].value;
-            }
+            user.profilePicture = profile.photos?.[0]?.value;
             await user.save();
           }
           return done(null, user);
@@ -36,7 +34,7 @@ passport.use(
           email,
           googleId: profile.id,
           profilePicture: profile.photos?.[0]?.value,
-          isVerified: true
+          isVerified: true,
         });
 
         await user.save();
