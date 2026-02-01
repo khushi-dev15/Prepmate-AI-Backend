@@ -1,6 +1,6 @@
 // ✅ Step 0: Load environment variables FIRST
-import dotenv from "dotenv";
-dotenv.config(); // MUST be first line
+// import dotenv from "dotenv";
+// dotenv.config(); // MUST be first line - REMOVED: called in server.js
 
 // ✅ Core imports
 import express from "express";
@@ -69,6 +69,7 @@ console.log("✅ Middleware configured");
 
 // ✅ Mount routes
 app.use("/api/auth", authRoutes);
+console.log("✅ Auth routes mounted at /api/auth");
 app.use("/api/users", userRoutes);
 app.use("/api/resume", resumeRoutes);
 app.use("/api/interview", interviewRoutes);

@@ -1,8 +1,12 @@
 // backend/src/services/gemini.service.js
+import { GoogleGenerativeAI } from "@google/generative-ai";
 import axios from "axios";
 
-const OPENAI_URL = "https://api.openai.com/v1/chat/completions"; // replace if you use a different Gemini endpoint
-const API_KEY = process.env.GEMINI_API_KEY;
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+
+const OPENAI_URL = "https://api.openai.com/v1/chat/completions";
+const OPENAI_API_KEY = process.env.OpenAI_API_KEY;
 
 // Generate 5 unique questions for given round
 export async function generateInterviewQuestions(jobTitle, round, jobDescription = "") {
@@ -13,26 +17,10 @@ export async function generateInterviewQuestions(jobTitle, round, jobDescription
   const prompt = interviewType === "technical"
     ? `${jobContext}You are an expert technical interviewer. Using the role title: "${jobTitle}", and the job context above when present, assume typical responsibilities and required technical skills for that role. Generate exactly 5 focused, practical technical interview questions that directly target skills, tools, algorithms, architecture, or problem-solving scenarios relevant to this role. Each question should be concise (one sentence) and reference the likely skill or concept being tested (e.g., "Concurrency in Node.js", "Database schema design", "Big-O complexity"). Return the questions as plain text, one question per line, with no numbering, no explanation, and no extra commentary.`
     : `${jobContext}You are an expert HR interviewer. Using the role title: "${jobTitle}", and the job context above when present, assume typical responsibilities and soft skills for that role. Generate exactly 5 HR interview questions that probe behavioral fit, communication, teamwork, leadership and culture-fit relevant to this role. Return the questions as plain text, one question per line, with no numbering, no explanation, and no extra commentary.`;
-  // If no API key provided, return local fallback questions
-  if (!API_KEY) {
-    return localGenerateQuestions(jobTitle, interviewType);
-  }
 
   try {
-    const res = await axios.post(OPENAI_URL, {
-      model: "gpt-4",
-      messages: [{ role: "user", content: prompt }],
-      max_tokens: 500,
-      temperature: 0.2
-    }, {
-      headers: {
-        Authorization: `Bearer ${API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      timeout: 20000
-    });
-
-    const text = res.data.choices?.[0]?.message?.content || "";
+    const result = await model.generateContent(prompt);
+    const text = result.response.text();
     const questions = text
       .split("\n")
       .map(q => q.replace(/^\s*[-•\d.)]+\s*/, "").trim())
@@ -42,7 +30,7 @@ export async function generateInterviewQuestions(jobTitle, round, jobDescription
     if (!questions.length) return localGenerateQuestions(jobTitle, interviewType);
     return questions;
   } catch (err) {
-    console.error("generateInterviewQuestions error:", err?.response?.data || err.message);
+    console.error("generateInterviewQuestions error:", err.message);
     return localGenerateQuestions(jobTitle, interviewType);
   }
 }
@@ -64,20 +52,8 @@ ${answers.map((a, i) => `${i + 1}. ${a || ""}`).join("\n")}
 `;
 
   try {
-    const res = await axios.post(OPENAI_URL, {
-      model: "gpt-4",
-      messages: [{ role: "user", content: prompt }],
-      max_tokens: 700,
-      temperature: 0.2
-    }, {
-      headers: {
-        Authorization: `Bearer ${API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      timeout: 20000
-    });
-
-    const text = res.data.choices?.[0]?.message?.content || "";
+    const result = await model.generateContent(prompt);
+    const text = result.response.text();
     // Extract JSON-looking content robustly
     const jsonMatch = text.match(/\[\s*\{[\s\S]*\}\s*\]/m);
     if (!jsonMatch) {
@@ -89,30 +65,45 @@ ${answers.map((a, i) => `${i + 1}. ${a || ""}`).join("\n")}
       feedback: item.feedback || String(item.feedback || "")
     }));
   } catch (err) {
-    console.error("evaluateAnswersWithAI error:", err?.response?.data || err.message);
+    console.error("evaluateAnswersWithAI error:", err.message);
     // fallback to local evaluator
     return localEvaluateAnswers(answers, jobTitle, round);
   }
 }
 
 // Local fallback generators/evaluators
-function localGenerateQuestions(jobTitle, type) {
-  if (type === "technical") {
-    return [
-      `Explain your most recent ${jobTitle} project and your role in it.`,
-      `Describe a technical challenge you faced related to ${jobTitle} tasks and how you solved it.`,
-      `How do you approach debugging and testing in ${jobTitle || "software"} work?`,
-      `Explain a core concept or tool commonly used in ${jobTitle} roles.`,
-      `Describe your experience with collaborative version control (e.g., git) in ${jobTitle} projects.`
-    ];
-  }
-  return [
+function localGenerateQuestions(jobTitle, interviewType) {
+  const technicalQuestions = [
+    `Explain your most recent ${jobTitle} project and your role in it.`,
+    `Describe a technical challenge you faced related to ${jobTitle} tasks and how you solved it.`,
+    `How do you approach debugging and testing in ${jobTitle || "software"} work?`,
+    `Explain a core concept or tool commonly used in ${jobTitle} roles.`,
+    `Describe your experience with collaborative version control (e.g., git) in ${jobTitle} projects.`,
+    `How do you ensure code quality and maintainability in your ${jobTitle} work?`,
+    `Explain your approach to problem-solving in ${jobTitle} scenarios.`,
+    `What technologies or frameworks are you most proficient in for ${jobTitle} roles?`,
+    `How do you stay updated with the latest trends in ${jobTitle} field?`,
+    `Describe a time when you optimized performance in a ${jobTitle} project.`
+  ];
+
+  const hrQuestions = [
     `Tell me about yourself and why you applied for the ${jobTitle} role.`,
     `Describe a time you worked in a team and what you contributed.`,
     `How do you handle tight deadlines and pressure?`,
     `Describe a time you received feedback and how you incorporated it.`,
-    `What motivates you to perform well in a ${jobTitle} position?`
+    `What motivates you to perform well in a ${jobTitle} position?`,
+    `How do you handle conflicts or disagreements in a team setting?`,
+    `Describe your ideal work environment for a ${jobTitle} role.`,
+    `How do you prioritize tasks when working on multiple projects?`,
+    `What are your career goals and how does this ${jobTitle} role fit into them?`,
+    `How do you maintain work-life balance in a demanding role?`
   ];
+
+  const questions = interviewType === "technical" ? technicalQuestions : hrQuestions;
+
+  // Return 5 random questions without repetition
+  const shuffled = questions.sort(() => 0.5 - Math.random());
+  return shuffled.slice(0, 5);
 }
 
 function localEvaluateAnswers(answers, jobTitle, round) {

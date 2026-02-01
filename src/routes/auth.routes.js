@@ -1,20 +1,14 @@
 import express from "express";
-import passport from "passport";
-import { googleOAuthCallback } from "../controllers/auth.controller.js";
+import { verifyToken } from "../controllers/auth.controller.js";
+import { protect } from "../middlewares/auth.middleware.js";
 
 const authRouter = express.Router();
 
-// Google OAuth Route - Initiate login
-authRouter.get(
-  "/google",
-  passport.authenticate("google", { scope: ["profile", "email"] })
-);
+console.log("📍 Auth routes initializing...");
 
-// Google OAuth Callback - Handle callback from Google
-authRouter.get(
-  "/google/callback",
-  passport.authenticate("google", { session: false, failureRedirect: "/auth?error=Google_auth_failed" }),
-  googleOAuthCallback
-);
+// Verify JWT Token - For persistent login
+authRouter.get("/verify", protect, verifyToken);
+
+console.log("✅ Auth routes initialized");
 
 export default authRouter;

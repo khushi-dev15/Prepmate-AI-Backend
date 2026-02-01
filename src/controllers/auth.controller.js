@@ -12,50 +12,6 @@ const transporter = nodemailer.createTransport({
   }
 });
 
-// Google OAuth Callback
-export const googleOAuthCallback = async (req, res) => {
-  try {
-    const { id, displayName, emails, photos } = req.user;
-    const email = emails?.[0]?.value;
-
-    if (!email) {
-      return res.status(400).redirect(
-        `${process.env.FRONTEND_URL}/auth?success=false&message=Email not provided`
-      );
-    }
-
-    let user = await User.findOne({ email });
-
-    // If user doesn't exist, create new user
-    if (!user) {
-      user = await User.create({
-        username: displayName || email.split('@')[0],
-        email,
-        googleId: id,
-        profilePicture: photos?.[0]?.value,
-        isVerified: true
-      });
-    } else if (!user.googleId) {
-      // Link Google ID to existing user
-      user.googleId = id;
-      if (photos?.[0]?.value) user.profilePicture = photos[0].value;
-      await user.save();
-    }
-
-    // Generate JWT token
-    const token = jwt.sign({ _id: user._id }, process.env.JWT_SECRET, { expiresIn: "7d" });
-
-    // Redirect to frontend with token
-    const redirectUrl = `${process.env.FRONTEND_URL || "http://localhost:5173"}/auth?success=true&token=${token}`;
-    return res.redirect(redirectUrl);
-  } catch (err) {
-    console.error("Google OAuth error:", err);
-    return res.redirect(
-      `${process.env.FRONTEND_URL || "http://localhost:5173"}/auth?success=false&message=${encodeURIComponent(err.message)}`
-    );
-  }
-};
-
 // Forgot Password - Send Reset Email
 export const forgotPassword = async (req, res) => {
   try {
@@ -154,6 +110,29 @@ export const resetPassword = async (req, res) => {
     });
   } catch (err) {
     console.error("Reset password error:", err);
+    return res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+// Verify JWT Token (for persistent login)
+export const verifyToken = async (req, res) => {
+  try {
+    // The protect middleware already verified the token and set req.user
+    const user = await User.findById(req.user._id).select('-password');
+    if (!user) {
+      return res.status(404).json({ success: false, message: "User not found" });
+    }
+    return res.status(200).json({
+      success: true,
+      user: {
+        _id: user._id,
+        username: user.username,
+        email: user.email,
+        profilePicture: user.profilePicture
+      }
+    });
+  } catch (err) {
+    console.error("Token verification error:", err);
     return res.status(500).json({ success: false, message: err.message });
   }
 };

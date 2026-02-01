@@ -1,17 +1,15 @@
 // src/controllers/resume.controller.js
 import fs from "fs";
 import path from "path";
-import { createRequire } from "module";
-const require = createRequire(import.meta.url);
 
 // Safely load pdf-parse with better error handling
 let pdfParse;
 try {
-  const pdfParseModule = require("pdf-parse");
-  pdfParse = pdfParseModule?.default || pdfParseModule;
+  const pdfParseModule = await import("pdf-parse");
+  pdfParse = pdfParseModule.PDFParse || pdfParseModule.default;
   if (typeof pdfParse !== 'function') {
     pdfParse = null;
-    console.warn('⚠️ pdf-parse loaded but not a function, fallback mode enabled');
+    console.warn('⚠️ pdf-parse PDFParse not a function, fallback mode enabled');
   }
 } catch (err) {
   console.error('⚠️ Failed to load pdf-parse:', err?.message);
