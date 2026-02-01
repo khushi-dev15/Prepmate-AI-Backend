@@ -75,3 +75,19 @@ export const getProfileController = async (req, res) => {
     return res.status(500).json({ success: false, message: err.message });
   }
 };
+
+export const logoutController = async (req, res) => {
+  try {
+    // Clear the token cookie
+    res.clearCookie("token", {
+      httpOnly: true,
+      sameSite: process.env.NODE_ENV === 'production' ? "none" : "lax",
+      secure: process.env.NODE_ENV === 'production'
+    });
+
+    res.status(200).json({ success: true, message: "Logged out successfully" });
+  } catch (err) {
+    console.error('Logout error:', err);
+    res.status(500).json({ success: false, message: err.message || "Logout failed" });
+  }
+};
