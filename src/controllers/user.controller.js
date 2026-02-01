@@ -14,9 +14,15 @@ export const registerController = async (req, res) => {
     const newUser = await createUser({ username, email, password: hashed });
 
     const token = jwt.sign({ _id: newUser._id }, process.env.JWT_SECRET, { expiresIn: "7d" });
-    res.cookie("token", token, { httpOnly: true, sameSite: "lax" });
+    const isProduction = process.env.NODE_ENV === 'production';
+    res.cookie("token", token, {
+      httpOnly: true,
+      sameSite: isProduction ? "none" : "lax",
+      secure: isProduction,
+      maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
+    });
 
-    res.status(201).json({ success: true, user: { id: newUser._id, username, email }, token });
+    res.status(201).json({ success: true, user: { _id: newUser._id, username, email }, token });
   } catch (err) {
     console.error('Register error:', err);
     res.status(500).json({ success: false, message: err.message || "Registration failed" });
@@ -35,9 +41,15 @@ export const loginController = async (req, res) => {
     if (!match) return res.status(401).json({ message: "Invalid email or password" });
 
     const token = jwt.sign({ _id: user._id }, process.env.JWT_SECRET, { expiresIn: "7d" });
-    res.cookie("token", token, { httpOnly: true, sameSite: "lax" });
+    const isProduction = process.env.NODE_ENV === 'production';
+    res.cookie("token", token, {
+      httpOnly: true,
+      sameSite: isProduction ? "none" : "lax",
+      secure: isProduction,
+      maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
+    });
 
-    res.status(200).json({ success: true, user: { id: user._id, username: user.username, email }, token });
+    res.status(200).json({ success: true, user: { _id: user._id, username: user.username, email }, token });
   } catch (err) {
     console.error('Login error:', err);
     res.status(500).json({ success: false, message: err.message || "Login failed" });
