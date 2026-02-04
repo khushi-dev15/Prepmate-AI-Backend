@@ -14,16 +14,16 @@ import "./config/passport.js";
 
 const app = express();
 
-// ✅ Trust proxy (REQUIRED for Render cookies)
+// ✅ REQUIRED for Render (cookies + proxy)
 app.set("trust proxy", 1);
 
-// ✅ CORS – SIMPLE & CORRECT
+// ✅ CORS (EXACT frontend URL)
 app.use(
   cors({
     origin: [
       "http://localhost:5173",
       "http://localhost:3000",
-      "https://prepmate-ai-frontend.onrender.com",
+      "https://prepmate-ai-website.onrender.com",
     ],
     credentials: true,
   })
@@ -55,10 +55,13 @@ app.use((req, res) => {
   res.status(404).json({ success: false, message: "Route not found" });
 });
 
-// ❌ Error handler
+// ❌ Global error handler
 app.use((err, req, res, next) => {
-  console.error(err);
-  res.status(500).json({ success: false, message: err.message });
+  console.error("🔥 Backend Error:", err);
+  res.status(500).json({
+    success: false,
+    message: err.message || "Internal Server Error",
+  });
 });
 
 export default app;
