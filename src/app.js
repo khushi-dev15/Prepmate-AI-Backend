@@ -17,15 +17,15 @@ const app = express();
 // ✅ REQUIRED for Render (cookies + proxy)
 app.set("trust proxy", 1);
 
-// ✅ CORS (EXACT frontend URL)
+// ✅ CORS (frontend URLs + localhost for dev)
 app.use(
   cors({
     origin: [
       "http://localhost:5173",
       "http://localhost:3000",
-      "https://prepmate-ai-website.onrender.com",
+      "https://prepmate-ai-website.onrender.com", // frontend on Render
     ],
-    credentials: true,
+    credentials: true, // allows cookies
   })
 );
 
