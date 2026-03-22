@@ -3,6 +3,7 @@ import User from "../models/user.model.js";
 import nodemailer from "nodemailer";
 import crypto from "crypto";
 import bcrypt from "bcryptjs";
+import { getCookieOptions } from "../utils/cookieOptions.js";
 
 // ================= EMAIL CONFIG =================
 const transporter = nodemailer.createTransport({
@@ -14,12 +15,25 @@ const transporter = nodemailer.createTransport({
 });
 
 // ================= REGISTER =================
-export const registerUser = async ({ name, email, password }) => {
+export const registerUser = async (req, res) => {
   try {
+    const { name, email, password } = req.body;
+
+    // Validation
+    if (!name || !email || !password) {
+      return res.status(400).json({
+        success: false,
+        message: "Name, email and password are required",
+      });
+    }
+
     // check if user exists
     const existingUser = await User.findOne({ email });
     if (existingUser) {
-      return { success: false, message: "User already exists" };
+      return res.status(400).json({
+        success: false,
+        message: "User already exists",
+      });
     }
 
     // hash password
@@ -32,12 +46,15 @@ export const registerUser = async ({ name, email, password }) => {
     });
 
     // generate JWT token
-    const token = jwt.sign({ id: newUser._id }, process.env.JWT_SECRET, { expiresIn: "7d" });
+    const token = jwt.sign({ _id: newUser._id }, process.env.JWT_SECRET, { expiresIn: "7d" });
 
-    return { success: true, user: newUser, token };
+    // ✅ Set cookie with secure options based on request protocol
+    res.cookie("token", token, getCookieOptions(req));
+
+    return res.status(201).json({ success: true, user: newUser, token });
   } catch (err) {
     console.error("🔥 registerUser error:", err);
-    return { success: false, message: err.message };
+    return res.status(500).json({ success: false, message: err.message });
   }
 };
 
@@ -69,17 +86,12 @@ export const loginUser = async (req, res) => {
       });
     }
 
-    const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, { expiresIn: "7d" });
+    const token = jwt.sign({ _id: user._id }, process.env.JWT_SECRET, { expiresIn: "7d" });
 
-    // ✅ Render cookie
-    res.cookie("token", token, {
-      httpOnly: true,
-      secure: true,
-      sameSite: "none",
-      maxAge: 7 * 24 * 60 * 60 * 1000,
-    });
+    // ✅ Render cookie with secure options based on request protocol
+    res.cookie("token", token, getCookieOptions(req));
 
-    return res.status(200).json({ success: true, user });
+    return res.status(200).json({ success: true, user, token });
   } catch (err) {
     console.error("❌ Login error:", err);
     return res.status(500).json({ success: false, message: "Login failed" });
@@ -89,7 +101,11 @@ export const loginUser = async (req, res) => {
 // ================= VERIFY TOKEN =================
 export const verifyToken = async (req, res) => {
   try {
-    const user = await User.findById(req.user.id).select("-password");
+    const userId = req.user?.id || req.user?._id;
+    if (!userId) {
+      return res.status(401).json({ success: false, message: "User ID not found in token" });
+    }
+    const user = await User.findById(userId).select("-password");
     if (!user) {
       return res.status(404).json({ success: false, message: "User not found" });
     }

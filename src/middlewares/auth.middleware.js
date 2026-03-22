@@ -10,15 +10,27 @@ export const protect = (req, res, next) => {
     token = req.headers.authorization?.split(" ")[1];
   }
 
+  // Fallback extra (mobile / browser privacy restrictions): accept explicit token in query/body
   if (!token) {
-    return res.status(401).json({ message: "No token, authorization denied" });
+    token = req.query?.token || req.body?.token;
+  }
+
+  if (!token) {
+    console.warn("❌ Auth failed: No token found in cookies or Authorization header");
+    console.warn("   Cookies available:", Object.keys(req.cookies || {}));
+    console.warn("   Authorization header:", req.headers.authorization ? "Present" : "Missing");
+    return res.status(401).json({ success: false, message: "No token, authorization denied" });
   }
 
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    // Handle both 'id' and '_id' patterns
     req.user = decoded;
+    console.log("✅ Auth successful for user:", decoded._id);
     next();
   } catch (err) {
-    res.status(401).json({ message: "Token is not valid" });
+    console.error("❌ Token verification failed:", err.message);
+    res.status(401).json({ success: false, message: "Token is not valid" });
   }
 };
+

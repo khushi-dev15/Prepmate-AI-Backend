@@ -8,6 +8,9 @@ export async function getInterviewQuestions(req, res) {
   const jobDescription = req.body.jobDescription || req.query.jobDescription || "";
   const round = req.body.round || req.query.round || "TR"; // TR or HR
   try {
+    if (!jobTitle) {
+      return res.status(400).json({ success: false, message: "jobTitle is required" });
+    }
     const questions = await generateInterviewQuestions(jobTitle, round, jobDescription);
     res.status(200).json({
       success: true,
@@ -16,19 +19,40 @@ export async function getInterviewQuestions(req, res) {
       round
     });
   } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+    console.error("❌ getInterviewQuestions error:", error);
+    res.status(500).json({ success: false, message: error.message || "Failed to generate questions" });
   }
 }
 
 export async function evaluateInterviewAnswer(req, res) {
   // expects { answers: ["..."], jobTitle: "...", round: "TR" }
   const { answers, jobTitle, round } = req.body;
-  if (!Array.isArray(answers)) return res.status(400).json({ success: false, message: "answers must be an array" });
+  
+  console.log("📥 evaluateInterviewAnswer called");
+  console.log("   jobTitle:", jobTitle);
+  console.log("   round:", round);
+  console.log("   answers count:", Array.isArray(answers) ? answers.length : "NOT_ARRAY");
+  
+  if (!Array.isArray(answers)) {
+    console.warn("⚠️  answers is not an array!");
+    return res.status(400).json({ success: false, message: "answers must be an array" });
+  }
+  
+  if (!jobTitle) {
+    console.warn("⚠️  jobTitle is missing!");
+    return res.status(400).json({ success: false, message: "jobTitle is required" });
+  }
+  
   try {
+    console.log("🔄 Calling evaluateAnswersWithAI...");
     const evaluation = await evaluateAnswersWithAI(answers, jobTitle, round || "HR");
+    console.log("✅ evaluateAnswersWithAI succeeded");
+    console.log("   Evaluation items:", evaluation.length);
     res.status(200).json({ success: true, evaluation });
   } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+    console.error("❌ evaluateInterviewAnswer error:", error.message);
+    console.error("   Full error:", error);
+    res.status(500).json({ success: false, message: error.message || "Failed to evaluate answers" });
   }
 }
 

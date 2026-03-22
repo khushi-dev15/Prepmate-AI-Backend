@@ -1,5 +1,5 @@
 import express from "express";
-import { getDbStatus, peekRecent } from "../controllers/debug.controller.js";
+import { getDbStatus, peekRecent, testGeminiAPI, diagnosticGemini } from "../controllers/debug.controller.js";
 import { protect } from "../middlewares/auth.middleware.js";
 
 const router = express.Router();
@@ -49,6 +49,26 @@ router.get('/peek-public', async (req, res) => {
 		return await peekRecent(req, res);
 	} catch (err) {
 		console.error('peek-public error', err && err.message);
+		return res.status(500).json({ success: false, message: err?.message || 'error' });
+	}
+});
+
+// Test Gemini API connectivity (no auth required for debugging)
+router.get('/test-gemini', async (req, res) => {
+	try {
+		return await testGeminiAPI(req, res);
+	} catch (err) {
+		console.error('test-gemini error', err && err.message);
+		return res.status(500).json({ success: false, message: err?.message || 'error' });
+	}
+});
+
+// Diagnostic Gemini API initialization (detailed debugging)
+router.get('/diagnostic-gemini', async (req, res) => {
+	try {
+		return await diagnosticGemini(req, res);
+	} catch (err) {
+		console.error('diagnostic-gemini error', err && err.message);
 		return res.status(500).json({ success: false, message: err?.message || 'error' });
 	}
 });

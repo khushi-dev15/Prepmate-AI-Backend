@@ -1,6 +1,7 @@
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import { createUser, findOneUser } from "../dao/user.dao.js";
+import { getCookieOptions } from "../utils/cookieOptions.js";
 
 export const registerController = async (req, res) => {
   try {
@@ -14,13 +15,7 @@ export const registerController = async (req, res) => {
     const newUser = await createUser({ username, email, password: hashed });
 
     const token = jwt.sign({ _id: newUser._id }, process.env.JWT_SECRET, { expiresIn: "7d" });
-    const isProduction = process.env.NODE_ENV === 'production';
-    res.cookie("token", token, {
-      httpOnly: true,
-      sameSite: isProduction ? "none" : "lax",
-      secure: isProduction,
-      maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
-    });
+    res.cookie("token", token, getCookieOptions(req));
 
     res.status(201).json({ success: true, user: { _id: newUser._id, username, email }, token });
   } catch (err) {
@@ -41,13 +36,7 @@ export const loginController = async (req, res) => {
     if (!match) return res.status(401).json({ message: "Invalid email or password" });
 
     const token = jwt.sign({ _id: user._id }, process.env.JWT_SECRET, { expiresIn: "7d" });
-    const isProduction = process.env.NODE_ENV === 'production';
-    res.cookie("token", token, {
-      httpOnly: true,
-      sameSite: isProduction ? "none" : "lax",
-      secure: isProduction,
-      maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
-    });
+    res.cookie("token", token, getCookieOptions(req));
 
     res.status(200).json({ success: true, user: { _id: user._id, username: user.username, email }, token });
   } catch (err) {
@@ -80,9 +69,8 @@ export const logoutController = async (req, res) => {
   try {
     // Clear the token cookie
     res.clearCookie("token", {
-      httpOnly: true,
-      sameSite: process.env.NODE_ENV === 'production' ? "none" : "lax",
-      secure: process.env.NODE_ENV === 'production'
+      ...getCookieOptions(req),
+      maxAge: 0 // Immediately expire the cookie
     });
 
     res.status(200).json({ success: true, message: "Logged out successfully" });
